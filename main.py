@@ -11,18 +11,22 @@ root.iconbitmap('images/icon.ico')
 
 customtkinter.set_appearance_mode('Dark')
 
-version = '1.6'
+version = '1.7'
 
 config_json_path = 'config.json'
 
 clicking = False
 cps = 10
+repeat = 0
 hotkey = 'f6'
 hotkey_recording = False
 selected_mouse_button = 'Left'
 selected_click_type = 'Single'
 window_width = 400
 window_height = 400
+
+repeat_until_stopped_enabled = True
+repeat_until_stopped = IntVar(value=1)
 
 esc_ref = None
 esc = IntVar(value=0)
@@ -72,6 +76,7 @@ def save_settings():
     global window_save
     settings = {
         'cps': max(1, min(cps, 2000)),
+        'repeat': repeat,
         'hotkey': hotkey,
         'selected_mouse_button': selected_mouse_button,
         'selected_click_type': selected_click_type,
@@ -87,12 +92,13 @@ def save_settings():
         json.dump(settings, f, indent=4)
 
 def load_settings():
-    global clicking, cps, hotkey, selected_mouse_button, selected_click_type, theme, window_width, window_height
+    global clicking, cps, hotkey, selected_mouse_button, selected_click_type, theme, window_width, window_height, repeat
     try:
         with open(config_json_path, 'r') as f:
             settings = json.load(f)
 
             cps = max(1, min(settings.get('cps', 10), 2000))
+            repeat = settings.get('repeat', 0)
             hotkey = settings.get('hotkey', 'f6')
 
             loaded_mouse_button = settings.get('selected_mouse_button', 'Left')
@@ -107,6 +113,7 @@ def load_settings():
             window_height = settings.get('window_height', root.winfo_height())
     except json.decoder.JSONDecodeError:
         cps = 10
+        repeat = 0
         hotkey = 'f6'
         selected_mouse_button = 'Left'
         selected_click_type = 'Single'
@@ -116,6 +123,7 @@ def load_settings():
         with open(config_json_path, 'w') as f:
             f.write(json.dumps({
                 'cps': cps,
+                'repeat': repeat,
                 'hotkey': hotkey,
                 'selected_mouse_button': selected_mouse_button,
                 'selected_click_type': selected_click_type,
@@ -124,7 +132,7 @@ def load_settings():
             }, indent=4))
 
 def reset_to_default_settings():
-    global clicking, cps, hotkey, selected_mouse_button, selected_click_type, theme, window_width, window_height, selected_click_type_var, selected_mouse_button_var, lp2, lp2_visible
+    global clicking, cps, hotkey, selected_mouse_button, selected_click_type, theme, window_width, window_height, selected_click_type_var, selected_mouse_button_var, lp2, lp2_visible, repeat
     if clicking:
         clicking = False
         update_window_title()
@@ -132,6 +140,7 @@ def reset_to_default_settings():
             autoclick_thread.join()
     if messagebox.askokcancel('Reset', 'Are u sure that u want to reset autoclicker to default settings?'):
         cps = 10
+        repeat = 0
         hotkey = 'f6'
         selected_mouse_button = 'Left'
         selected_mouse_button_var.set('Left')
@@ -142,6 +151,9 @@ def reset_to_default_settings():
 
         v2.delete(0, END)
         v2.insert(0, str(cps))
+
+        r2.delete(0, END)
+        r2.insert(0, str(repeat))
 
         lp2.grid_forget()
         lp2_visible = False
@@ -164,7 +176,7 @@ def set_cps():
     global cps
     try:
         new_cps = float(v2.get())
-        if int(new_cps) > 2000:
+        if int(new_cps) > 2000 or int(new_cps) < 0:
             cps = 10
 
             v2.delete(0, END)
@@ -182,43 +194,78 @@ def set_cps():
         
         messagebox.showerror('Error', 'Invalid CPS. Please enter a valid number.')
 
+def set_repeat():
+    global repeat
+    try:
+        new_repeat = float(r2.get())
+        if int(new_repeat) < 0:
+            repeat = 10
+
+            r2.delete(0, END)
+            r2.insert(0, str(repeat))
+
+            messagebox.showerror('Error', 'Invalid Repeat. Please enter a valid number.')
+        else:
+            repeat = int(new_repeat)
+            save_settings()
+    except ValueError:
+        repeat = 10
+
+        r2.delete(0, END)
+        r2.insert(0, str(repeat))
+        
+        messagebox.showerror('Error', 'Invalid Repeat. Please enter a valid number.')
+
 def autoclick():
-    global sound_enabled
+    global clicking, cps, repeat_until_stopped_enabled, repeat
     while True:
-        if clicking:
-            if selected_click_type == 'Single':
-                mouse.click(selected_mouse_button.lower())
-                if sound_enabled:
-                    play_clicking_sound()
-            elif selected_click_type == 'Double':
-                mouse.double_click(selected_mouse_button.lower())
-                if sound_enabled:
-                    for _ in range(2):
-                        play_clicking_sound()
-                time.sleep(1 / cps)
-            elif selected_click_type == 'Triple':
-                for _ in range(3):
-                    mouse.click(selected_mouse_button.lower())
-                    if sound_enabled:
-                        play_clicking_sound()
-                    time.sleep(1 / cps)
-            elif selected_click_type == 'Quadruple':
-                for _ in range(2):
-                    mouse.double_click(selected_mouse_button.lower())
-                    mouse.double_click(selected_mouse_button.lower())
-                    if sound_enabled:
-                        for _ in range(4):
-                            play_clicking_sound()
-                    time.sleep(1 / cps)
+        if clicking and int(cps) >= 0:
+            if not repeat_until_stopped_enabled and int(repeat) > 0:
+                click()
+                repeat -= 1
+                if repeat <= 0:
+                    clicking = False
+                    update_window_title()
+                    if autoclick_thread is not None and autoclick_thread.is_alive():
+                        autoclick_thread.join()
+            else:
+                click()
             time.sleep(0.95 / cps)
         else:
             break
+
+def click():
+    global sound_enabled
+    if selected_click_type == 'Single':
+        mouse.click(selected_mouse_button.lower())
+        if sound_enabled:
+            play_clicking_sound()
+    elif selected_click_type == 'Double':
+        mouse.double_click(selected_mouse_button.lower())
+        if sound_enabled:
+            for _ in range(2):
+                play_clicking_sound()
+        time.sleep(1 / cps)
+    elif selected_click_type == 'Triple':
+        for _ in range(3):
+            mouse.click(selected_mouse_button.lower())
+            if sound_enabled:
+                play_clicking_sound()
+            time.sleep(1 / cps)
+    elif selected_click_type == 'Quadruple':
+        for _ in range(2):
+            mouse.double_click(selected_mouse_button.lower())
+            mouse.double_click(selected_mouse_button.lower())
+            if sound_enabled:
+                for _ in range(4):
+                    play_clicking_sound()
+            time.sleep(1 / cps)
 
 def turn_on_autoclicker():
     global clicking, autoclick_thread, cps
     if not clicking:
         try:
-            if int(cps) > 2000:
+            if int(cps) > 2000 or int(cps) < 0:
                 messagebox.showerror('Error', 'CPS cannot be set above 2,000.')
             else:
                 clicking = True
@@ -235,7 +282,7 @@ def turn_off_autoclicker():
     global clicking, autoclick_thread, cps
     if clicking:
         try:
-            if int(cps) > 2000:
+            if int(cps) > 2000 or int(cps) < 0:
                 messagebox.showerror('Error', 'CPS cannot be set above 2,000.')
             else:
                 clicking = False
@@ -375,6 +422,16 @@ def toggle_theme():
     else:
         customtkinter.set_appearance_mode('Dark')
 
+def repeat_until_stopped_toggle():
+    global repeat_until_stopped_enabled
+    repeat_until_stopped_state = repeat_until_stopped.get()
+    if repeat_until_stopped_state == 1:
+        repeat_until_stopped_enabled = True
+        save_settings()
+    else:
+        repeat_until_stopped_enabled = False
+        save_settings()
+
 # def on_window_resize(event):
     # global window_width, window_height
     # window_width = event.width
@@ -441,23 +498,36 @@ v2c.grid(row=5, column=2, pady=(5, 0), padx=(5, 5), sticky='w')
 v3 = CTkButton(lp2, text='Set CPS', command=set_cps)
 v3.grid(row=7, column=0, columnspan=2, pady=(5, 0), sticky='ew')
 
+r1 = CTkLabel(lp2, text='Repeat: (repeat CPS)')
+r1.grid(row=8, column=0, pady=(5, 0), sticky='w')
+
+r2 = CTkEntry(lp2)
+r2.insert(0, str(repeat))
+r2.grid(row=8, column=1, pady=(5, 0), sticky='ew')
+
+r3 = CTkButton(lp2, text='Set Repeat', command=set_repeat)
+r3.grid(row=9, column=0, columnspan=2, pady=(5, 0), sticky='ew')
+
+repeat_until_stopped = CTkCheckBox(lp2, text='Repeat until stopped', variable=repeat_until_stopped, command=repeat_until_stopped_toggle)
+repeat_until_stopped.grid(row=8, column=2, columnspan=2, pady=(5, 0), padx=(5, 5), sticky='w')
+
 esc = CTkCheckBox(lp2, text='ESC to stop autoclicking', variable=esc, command=toggle_esc)
-esc.grid(row=8, column=0, columnspan=2, pady=(10, 0), sticky='w')
+esc.grid(row=10, column=0, columnspan=2, pady=(5, 0), sticky='w')
 
 show = CTkCheckBox(lp2, text='Show autoclicker over all other windows', variable=show, command=toggle_show)
-show.grid(row=9, column=0, columnspan=2, pady=(5, 0), sticky='w')
+show.grid(row=11, column=0, columnspan=2, pady=(5, 0), sticky='w')
 
 window = CTkCheckBox(lp2, text='Save window height and width on exit', variable=window, command=toggle_window_saving_width_height_on_exit)
-window.grid(row=10, column=0, columnspan=2, pady=(5, 0), sticky='w')
+window.grid(row=12, column=0, columnspan=2, pady=(5, 0), sticky='w')
 
 sound = CTkCheckBox(lp2, text='Toggle clicking sounds', variable=sound, command=toggle_clicking_sounds)
-sound.grid(row=11, column=0, columnspan=2, pady=(5, 0), sticky='w')
+sound.grid(row=13, column=0, columnspan=2, pady=(5, 0), sticky='w')
 
 labels = CTkCheckBox(lp2, text='Hide text labels at right of autoclicker', variable=labels, command=toggle_labels)
-labels.grid(row=12, column=0, columnspan=2, pady=(5, 0), sticky='w')
+labels.grid(row=14, column=0, columnspan=2, pady=(5, 0), sticky='w')
 
 theme = CTkCheckBox(lp2, text='Light theme', variable=theme, command=toggle_theme)
-theme.grid(row=13, column=0, columnspan=2, pady=(5, 0), sticky='w')
+theme.grid(row=15, column=0, columnspan=2, pady=(5, 0), sticky='w')
 
 t3 = CTkLabel(lp, text=('v' + str(version)))
 t3.grid(row=9, column=0, columnspan=2, pady=(5, 0), sticky='ew')
