@@ -1,4 +1,4 @@
-# Autoclicker Pro: Elevating Your Click Automation Experience
+# Autoclicker Pro
 
 ![Autoclicker Pro Icon](images/icon.ico)
 
