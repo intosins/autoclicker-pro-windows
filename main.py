@@ -11,7 +11,7 @@ root.iconbitmap('images/icon.ico')
 
 customtkinter.set_appearance_mode('Dark')
 
-version = '1.8'
+version = '1.9'
 
 config_json_path = 'config.json'
 
@@ -148,6 +148,8 @@ def reset_to_default_settings():
         selected_click_type_var.set('Single')
         window_width = 400
         window_height = 400
+
+        t2.configure(text=('Hotkey: ' + hotkey.upper()))
 
         v2.delete(0, END)
         v2.insert(0, str(cps))
