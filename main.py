@@ -11,7 +11,7 @@ root.iconbitmap('images/icon.ico')
 
 customtkinter.set_appearance_mode('Dark')
 
-version = '1.7'
+version = '1.8'
 
 config_json_path = 'config.json'
 
@@ -199,7 +199,7 @@ def set_repeat():
     try:
         new_repeat = float(r2.get())
         if int(new_repeat) < 0:
-            repeat = 10
+            repeat = 0
 
             r2.delete(0, END)
             r2.insert(0, str(repeat))
@@ -209,7 +209,7 @@ def set_repeat():
             repeat = int(new_repeat)
             save_settings()
     except ValueError:
-        repeat = 10
+        repeat = 0
 
         r2.delete(0, END)
         r2.insert(0, str(repeat))
@@ -336,7 +336,7 @@ def hotkey_record():
             t2.configure(text=('Hotkey: ' + hotkey.upper()))
 
             try:
-                keyboard.remove_hotkey(hotkey)
+                keyboard.unhook_key(hotkey)
             except ValueError:
                 pass
 
@@ -353,7 +353,7 @@ def wait_for_key_press(event):
     b1.configure(text='Change Hotkey')
 
     keyboard.unhook_all()
-    keyboard.add_hotkey(hotkey, lambda: hotkey_autoclicker(None))
+    keyboard.hook_key(hotkey, hotkey_autoclicker)
 
 def display_info():
     messagebox.showinfo('Info', 'Enjoy using the autoclicker! (@intosins)')
@@ -442,7 +442,7 @@ load_settings()
 
 root.bind_all('<1>', lambda event: event.widget.focus_set())
 
-keyboard.add_hotkey(hotkey, hotkey_autoclicker, args=(keyboard.KeyboardEvent(hotkey, 1),))
+keyboard.hook_key(hotkey, hotkey_autoclicker)
 
 lp = CTkFrame(root)
 lp.grid(row=1, column=0, sticky='nsew')
